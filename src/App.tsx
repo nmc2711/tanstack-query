@@ -1,40 +1,57 @@
-import { useState } from "react";
-import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import React from "react";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import axios from "axios";
 import "./App.css";
 
-const fetchToDos = async (page) => {
-  return await axios.get(
-    `https://jsonplaceholder.typicode.com/todos?_page=${page}&_limit=10`
+const fetchToDos = async ({ pageParam = 1 }) => {
+  const response = await axios.get(
+    `https://jsonplaceholder.typicode.com/todos?_page=${pageParam}&_limit=10`
   );
+  return response.data;
 };
 
 function App() {
-  const [page, setPage] = useState(1);
-
-  const { data, isFetching, isError } = useQuery({
-    queryKey: ["todos", page],
-    queryFn: () => fetchToDos(page),
-    placeholderData: keepPreviousData,
+  const {
+    data,
+    isError,
+    error,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ["todos"],
+    queryFn: fetchToDos,
+    getNextPageParam: (lastPage, allPages) => {
+      // 여기서 다음 페이지 번호를 결정합니다.
+      // 예를 들어, 총 페이지 수가 알려져 있다면 그에 따라 조정할 수 있습니다.
+      const nextPage = allPages.length + 1;
+      return nextPage <= 5 ? nextPage : undefined; // 최대 5 페이지까지만 불러오도록 설정
+    },
   });
 
   return (
     <main>
       <header>
-        <h3>현재 페이지: {page}</h3>
+        <h3>할 일 목록</h3>
       </header>
-      <nav>
-        <button onClick={() => setPage(page - 1)}>이전</button>{" "}
-        <button onClick={() => setPage(page + 1)}>다음</button>
-      </nav>
       <section>
-        {isFetching && <p> 로딩중...</p>}
+        {isFetchingNextPage && <p>로딩중...</p>}
         {isError && <article>에러메시지: {error.message}</article>}
         <ul>
-          {data?.data.map((project) => (
-            <li key={project.id}>{project.title}</li>
+          {data?.pages.map((group, i) => (
+            <React.Fragment key={i}>
+              {group.map((todo) => (
+                <li key={todo.id}>{todo.title}</li>
+              ))}
+            </React.Fragment>
           ))}
         </ul>
+        <button
+          onClick={() => fetchNextPage()}
+          disabled={!hasNextPage || isFetchingNextPage}
+        >
+          {isFetchingNextPage ? "로딩 중..." : "더 보기"}
+        </button>
       </section>
     </main>
   );

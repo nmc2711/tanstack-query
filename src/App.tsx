@@ -1,5 +1,9 @@
 import React from "react";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import axios from "axios";
 import "./App.css";
 
@@ -12,7 +16,17 @@ const fetchToDos = async ({ pageParam = 1 }) => {
   return response.data;
 };
 
+const createTodo = async (newTodo) => {
+  const response = await axios.post(
+    "https://jsonplaceholder.typicode.com/todos",
+    newTodo
+  );
+  return response.data;
+};
+
 function App() {
+  const queryClient = useQueryClient();
+
   const {
     data,
     isError,
@@ -24,10 +38,8 @@ function App() {
     queryKey: ["todos"],
     queryFn: fetchToDos,
     getNextPageParam: (lastPage, allPages) => {
-      // 여기서 다음 페이지 번호를 결정합니다.
-      // 예를 들어, 총 페이지 수가 알려져 있다면 그에 따라 조정할 수 있습니다.
       const nextPage = allPages.length + 1;
-      return nextPage <= 5 ? nextPage : undefined; // 최대 5 페이지까지만 불러오도록 설정
+      return nextPage <= 5 ? nextPage : undefined;
     },
     initialData: {
       pages: [
@@ -37,6 +49,25 @@ function App() {
         ],
       ],
       pageParams: [1],
+    },
+  });
+  const addNewTodo = () => {
+    const newTodo = {
+      userId: 1,
+      id: Date.now(),
+      title: "새로운 할 일",
+      completed: false,
+    };
+    addTodoMutation.mutate(newTodo);
+  };
+
+  const addTodoMutation = useMutation({
+    mutationFn: createTodo,
+    onSuccess(data) {
+      const currentData = queryClient.getQueryData(["add"]);
+      const updatedData = currentData ? [...currentData, data] : [data];
+
+      queryClient.setQueryData(["add"], updatedData);
     },
   });
 
@@ -62,6 +93,9 @@ function App() {
           disabled={!hasNextPage || isFetchingNextPage}
         >
           {isFetchingNextPage ? "로딩 중..." : "더 보기"}
+        </button>
+        <button onClick={addNewTodo} disabled={addTodoMutation.isLoading}>
+          {addTodoMutation.isPending ? "추가 중..." : "할 일 추가"}
         </button>
       </section>
     </main>
